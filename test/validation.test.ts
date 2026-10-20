@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeProfileUrl, profileInputSchema } from "../src/lib/validation.ts";
 import { validateServerEnv } from "../src/lib/env.ts";
+import { isPrismaUniqueConstraintError, parseImportContent } from "../src/modules/profile-imports/import-service.ts";
+import { normalizeImportRequest } from "../src/lib/import-api.ts";
+import { canPreviewImport } from "../src/modules/profile-imports/import-ui.ts";
 
 test("normalizes profile URLs to a stable unique key", () => {
   assert.equal(
@@ -34,4 +37,48 @@ test("environment validation reports variable names without secret values", () =
     assert.match(message, /DATABASE_URL/);
     assert.doesNotMatch(message, /do-not-print/);
   }
+});
+
+test("import parsing normalizes URL variations and detects repeated input rows", () => {
+  const parsed = parseImportContent("urls", "HTTPS://www.linkedin.com/in/alice/?trk=abc#about\nhttps://WWW.LINKEDIN.com/in/alice\nhttps://www.linkedin.com/in/bob/");
+
+  assert.equal(parsed.candidates.length, 2);
+  assert.equal(parsed.candidates[0]?.profileUrl, "https://www.linkedin.com/in/alice");
+  assert.equal(parsed.duplicateInputRows.length, 1);
+  assert.equal(parsed.duplicateInputRows[0]?.duplicateOfRow, 1);
+});
+
+test("CSV parsing reports malformed rows and accepts URL-only records", () => {
+  const parsed = parseImportContent("csv", "profileUrl,fullName\nhttps://www.linkedin.com/in/alice,Alice Example\n\"broken");
+
+  assert.equal(parsed.candidates.length, 1);
+  assert.ok(parsed.invalidRows.length >= 1);
+});
+
+test("repeated imports remain idempotent at the parsed-record boundary", () => {
+  const first = parseImportContent("urls", "https://www.linkedin.com/in/alice");
+  const second = parseImportContent("urls", "https://www.linkedin.com/in/alice/");
+
+  assert.equal(first.candidates[0]?.profileUrl, second.candidates[0]?.profileUrl);
+  assert.equal(isPrismaUniqueConstraintError({ code: "P2002" }), true);
+  assert.equal(isPrismaUniqueConstraintError({ code: "P2025" }), false);
+});
+
+test("source search URLs are validated as metadata and never fetched", () => {
+  const valid = normalizeImportRequest({ listId: "list-1", mode: "urls", content: "https://www.linkedin.com/in/alice", sourceSearchUrl: "https://www.linkedin.com/search/results/people/?keywords=design" });
+  const invalid = normalizeImportRequest({ listId: "list-1", mode: "urls", content: "https://www.linkedin.com/in/alice", sourceSearchUrl: "https://example.com/search/results/people" });
+
+  assert.equal(valid.success, true);
+  assert.equal(invalid.success, false);
+});
+
+test("preview enables for non-whitespace pasted input without requiring a list", () => {
+  assert.equal(canPreviewImport("  \nhttps://www.linkedin.com/in/example-person-one/\n", false), true);
+  assert.equal(canPreviewImport(" \n\t", false), false);
+  assert.equal(canPreviewImport("https://www.linkedin.com/in/example-person-one/", true), false);
+
+  const parsed = parseImportContent("urls", "https://www.linkedin.com/in/example-person-one/\nhttps://www.linkedin.com/in/example-person-two/\nhttps://www.linkedin.com/in/example-person-one");
+  assert.equal(parsed.candidates.length, 2);
+  assert.equal(parsed.duplicateInputRows.length, 1);
+  assert.equal(parsed.invalidRows.length, 0);
 });

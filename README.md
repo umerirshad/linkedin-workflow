@@ -25,12 +25,15 @@ The versions are pinned or range-constrained to stay on the installed major line
 ```bash
 cp .env.example .env
 # Set DATABASE_URL in .env
+# Set APP_AUTH_TOKEN before exposing the workspace outside local development.
 npm install
 npx prisma migrate dev
 npm run dev
 ```
 
 Open http://localhost:3000. `npm run lint` and `npm run build` are the available checks.
+
+Phase 2 imports are available at `/import`. Create or select a `ProfileList`, preview pasted URLs or CSV rows, then confirm the import. The optional LinkedIn people-search URL is stored as import metadata only; it is never fetched. In production, `/`, `/import`, and private API routes require the `APP_AUTH_TOKEN` single-user session configured through `/login`.
 
 ## Structure
 

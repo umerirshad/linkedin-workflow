@@ -7,6 +7,7 @@ const optionalSecret = z.preprocess(
 
 const serverEnvSchema = z.object({
   DATABASE_URL: z.string().trim().url(),
+  APP_AUTH_TOKEN: optionalSecret,
   LINKEDIN_CLIENT_ID: optionalSecret,
   LINKEDIN_CLIENT_SECRET: optionalSecret,
 });
