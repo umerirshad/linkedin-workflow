@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ImportSource {
+  CSV
+  AUTHORIZED_PROVIDER
+}
+
+enum ProfileStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  SKIPPED
+}
+
+enum ExecutionStatus {
+  DRAFT
+  READY
+  RUNNING
+  PAUSED
+  COMPLETE
+  FAILED
+}
+
+model Profile {
+  id             String       @id @default(cuid())
+  externalKey    String?
+  firstName      String?
+  lastName       String?
+  fullName       String
+  headline       String?
+  company        String?
+  profileUrl     String?
+  email          String?
+  notes          String?
+  status         ProfileStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  imports        ProfileImport[]
+  memberships    ListMember[]
+  manualTasks    ManualTask[]
+
+  @@index([profileUrl])
+  @@index([status])
+}
+
+model ProfileImport {
+  id             String       @id @default(cuid())
+  source         ImportSource
+  provider       String?
+  sourceLabel    String?
+  importedAt     DateTime     @default(now())
+  rawData        Json?
+  profileId      String
+  profile        Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, importedAt])
+}
+
+model ContactList {
+  id             String       @id @default(cuid())
+  name           String
+  description    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  members        ListMember[]
+  workflows      Workflow[]
+}
+
+model ListMember {
+  id             String       @id @default(cuid())
+  listId         String
+  profileId      String
+  addedAt        DateTime     @default(now())
+  list           ContactList  @relation(fields: [listId], references: [id], onDelete: Cascade)
+  profile        Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, profileId])
+  @@index([profileId])
+}
+
+model Workflow {
+  id             String          @id @default(cuid())
+  name           String
+  description    String?
+  definition     Json
+  status         ExecutionStatus @default(DRAFT)
+  listId         String?
+  list           ContactList?    @relation(fields: [listId], references: [id], onDelete: SetNull)
+  executions     WorkflowExecution[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model WorkflowExecution {
+  id             String          @id @default(cuid())
+  workflowId     String
+  status         ExecutionStatus @default(READY)
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  workflow       Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  manualTasks    ManualTask[]
+
+  @@index([workflowId, status])
+}
+
+model ManualTask {
+  id             String            @id @default(cuid())
+  title          String
+  instructions   String
+  status         TaskStatus        @default(TODO)
+  dueAt          DateTime?
+  profileId      String?
+  executionId    String?
+  profile        Profile?          @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  execution      WorkflowExecution? @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([status, dueAt])
+}
