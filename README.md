@@ -26,7 +26,7 @@ The versions are pinned or range-constrained to stay on the installed major line
 cp .env.example .env
 # Set DATABASE_URL in .env
 npm install
-npx prisma migrate dev --name init
+npx prisma migrate dev
 npm run dev
 ```
 

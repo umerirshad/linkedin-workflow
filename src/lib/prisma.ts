@@ -1,21 +1,16 @@
 import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "@prisma/client";
+import { getServerEnv } from "./env";
 
-type PrismaClientConstructor = new (options: { adapter: PrismaPg }) => unknown;
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-const globalForPrisma = globalThis as unknown as { prisma?: unknown };
-
-/** The generated Prisma client is created by `prisma generate` in a database-enabled environment. */
-export async function getPrismaClient(): Promise<unknown> {
-  if (globalForPrisma.prisma) return globalForPrisma.prisma;
-
-  const clientModule = (await import("@prisma/client")) as unknown as {
-    PrismaClient: PrismaClientConstructor;
-  };
-  const client = new clientModule.PrismaClient({
-    adapter: new PrismaPg({
-      connectionString: process.env.DATABASE_URL,
-    }),
+function createPrismaClient() {
+  const { DATABASE_URL } = getServerEnv();
+  return new PrismaClient({
+    adapter: new PrismaPg({ connectionString: DATABASE_URL }),
   });
-  if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = client;
-  return client;
 }
+
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
