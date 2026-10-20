@@ -17,6 +17,12 @@ enum ProfileStatus {
   ARCHIVED
 }
 
+enum PictureStatus {
+  PRESENT
+  MISSING
+  UNKNOWN
+}
+
 enum TaskStatus {
   TODO
   IN_PROGRESS
@@ -40,23 +46,25 @@ enum ImportRunStatus {
 }
 
 model Profile {
-  id          String        @id @default(cuid())
-  externalKey String?
-  firstName   String?
-  lastName    String?
-  fullName    String
-  headline    String?
-  company     String?
-  profileUrl  String?       @unique
-  email       String?
-  notes       String?
-  status      ProfileStatus @default(ACTIVE)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  memberships ListProfile[]
-  manualTasks ManualTask[]
+  id            String        @id @default(cuid())
+  externalKey   String?
+  firstName     String?
+  lastName      String?
+  fullName      String
+  headline      String?
+  company       String?
+  profileUrl    String?       @unique
+  email         String?
+  notes         String?
+  status        ProfileStatus @default(ACTIVE)
+  pictureStatus PictureStatus @default(UNKNOWN)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  memberships   ListProfile[]
+  manualTasks   ManualTask[]
 
   @@index([status])
+  @@index([pictureStatus])
 }
 
 model ImportRun {

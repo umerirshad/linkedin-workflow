@@ -19,6 +19,7 @@ export default function ImportPage() {
   const [mode, setMode] = useState<"urls" | "csv">("urls");
   const [content, setContent] = useState("");
   const [sourceSearchUrl, setSourceSearchUrl] = useState("");
+  const [newListName, setNewListName] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -41,6 +42,33 @@ export default function ImportPage() {
     }
     setMode("csv");
     file.text().then(setContent).catch(() => setMessage("The CSV file could not be read."));
+  }
+
+  async function createList() {
+    const name = newListName.trim();
+    if (!name) {
+      setMessage("Enter a name for the destination list.");
+      return;
+    }
+
+    setMessage("");
+    try {
+      const response = await fetch("/api/lists", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Unable to create list");
+      const createdList: List = { ...result.list, memberCount: 0 };
+      setLists((current) => [...current, createdList].sort((a, b) => a.name.localeCompare(b.name)));
+      setListId(createdList.id);
+      setNewListName("");
+      setMessage(`Destination list “${createdList.name}” is ready.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to create list");
+    }
   }
 
   async function submit(action: "preview" | "import") {
@@ -81,6 +109,7 @@ export default function ImportPage() {
     <section className="import-grid"><form className="panel import-form" onSubmit={(event) => { event.preventDefault(); void submit("preview"); }}>
       <div className="panel-heading"><div><p className="eyebrow">Import source</p><h3>Prepare records</h3></div></div>
       <label>Destination list<select value={listId} onChange={(event) => setListId(event.target.value)}><option value="">Select a list</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.name} · {list.memberCount} members</option>)}</select></label>
+      <div className="create-list-form"><input aria-label="New destination list name" value={newListName} onChange={(event) => setNewListName(event.target.value)} placeholder="New list name" /><button type="button" onClick={() => void createList()}>Create list</button></div>
       <div className="mode-tabs" role="tablist"><button type="button" className={mode === "urls" ? "selected" : ""} onClick={() => setMode("urls")}>Pasted URLs</button><button type="button" className={mode === "csv" ? "selected" : ""} onClick={() => setMode("csv")}>CSV upload</button></div>
       {mode === "urls" ? <label>Profile URLs<textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder="https://www.linkedin.com/in/alex-example/&#10;https://www.linkedin.com/in/sam-example/" rows={8} required /></label> : <><label>CSV file<input type="file" accept=".csv,text/csv" onChange={selectFile} /></label><label>CSV preview content<textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder="fullName,profileUrl,company" rows={8} required /></label></>}
       <label>LinkedIn people-search URL <span className="optional">optional metadata</span><input value={sourceSearchUrl} onChange={(event) => setSourceSearchUrl(event.target.value)} placeholder="https://www.linkedin.com/search/results/people/?keywords=design" /></label>
